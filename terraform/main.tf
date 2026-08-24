@@ -28,11 +28,15 @@ provider "openstack" {
 
 locals {
   # Diese Werte sind App-spezifisch und werden vom App-Entwickler definiert
-  app_name           = "ubuntu-user"
-  flavor             = "gp1.small"
-  key_pair           = "" # Leer = nur Passwort-Auth
-  enable_floating_ip = true
-  metadata           = {}
+  app_name = "ubuntu-user"
+  flavor   = "gp1.small"
+  key_pair = "" # Leer = nur Passwort-Auth
+
+  # Adressen in DHBWv4 sind oeffentlich geroutet, die
+  # feste Adresse der Instanz ist also fuer sich erreichbar.
+  enable_floating_ip = false
+
+  metadata = {}
 }
 
 ############################
