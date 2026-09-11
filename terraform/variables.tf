@@ -22,7 +22,7 @@ variable "image_name" {
 variable "network_uuid" {
   description = "Hauptnetzwerk @openstack:network:id"
   type        = string
-  default     = "34a00b87-57ce-42c4-8e1b-9ea8a657ec2e"
+  default     = "9b579624-d844-4df3-b38d-89978b31d37d"
 }
 
 variable "floating_ip_pool" {
@@ -34,5 +34,5 @@ variable "floating_ip_pool" {
 variable "shared_secgroup_id" {
   description = "ID der gemeinsamen Security Group für alle VMs @openstack:security_group:id"
   type        = string
-  default     = "4ffaf007-df66-4250-9118-1bd99378d34a"
+  default     = "7ca4f889-e11e-4a16-83a8-73a77ebdbbe6"
 }

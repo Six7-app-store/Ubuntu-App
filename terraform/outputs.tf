@@ -9,7 +9,7 @@ output "user_accounts" {
   value = length(local.all_users) > 0 ? {
     for i in range(length(local.all_users)) : local.user_ids[i] => {
       type     = "password"
-      ip       = local.enable_floating_ip ? openstack_networking_floatingip_v2.fip[0].address : openstack_compute_instance_v2.shared_vm.network[0].fixed_ip_v4
+      ip       = local.enable_floating_ip ? openstack_networking_floatingip_v2.fip[0].address : openstack_compute_instance_v2.shared_vm.network[0].fixed_ip_v6
       port     = 22
       username = local.usernames[i]
       auth     = random_password.user_passwords[i].result
@@ -29,12 +29,12 @@ output "team_vms" {
     shared_vm = {
       instance_id   = openstack_compute_instance_v2.shared_vm.id
       instance_name = openstack_compute_instance_v2.shared_vm.name
-      fixed_ip      = openstack_compute_instance_v2.shared_vm.network[0].fixed_ip_v4
+      fixed_ip_v6   = openstack_compute_instance_v2.shared_vm.network[0].fixed_ip_v6
       floating_ip   = local.enable_floating_ip ? openstack_networking_floatingip_v2.fip[0].address : null
       users = [for i in range(length(local.all_users)) : {
         username    = local.usernames[i]
         team        = local.all_users[i].team
-        ssh_command = local.enable_floating_ip ? "ssh ${local.usernames[i]}@${openstack_networking_floatingip_v2.fip[0].address}" : "ssh ${local.usernames[i]}@${openstack_compute_instance_v2.shared_vm.network[0].fixed_ip_v4}"
+        ssh_command = local.enable_floating_ip ? "ssh ${local.usernames[i]}@${openstack_networking_floatingip_v2.fip[0].address}" : "ssh ${local.usernames[i]}@${openstack_compute_instance_v2.shared_vm.network[0].fixed_ip_v6}"
       }]
     }
   } : {}

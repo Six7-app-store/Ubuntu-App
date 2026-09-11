@@ -10,7 +10,7 @@ packer {
 source "openstack" "image" {
   cloud             = "openstack"
   image_name        = var.image_name
-  source_image_name = "Ubuntu 22.04"
+  source_image_name = var.source_image_name
   flavor            = "gp1.small"
   networks          = var.networks
   security_groups   = var.security_groups
