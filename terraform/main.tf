@@ -32,8 +32,13 @@ locals {
   flavor   = "gp1.small"
   key_pair = "" # Leer = nur Passwort-Auth
 
-  # Adressen in DHBWv4 sind oeffentlich geroutet, die
-  # feste Adresse der Instanz ist also fuer sich erreichbar.
+  # Keine Floating IP. Sie liesse sich in diesem Projekt zwar anlegen,
+  # aber nicht zuweisen - zwischen VM-Subnetz und externem Netz fehlt
+  # der Router ("External network ... is not reachable from subnet").
+  #
+  # Oeffentlich erreichbar ist die Instanz ueber IPv6; die feste IPv4
+  # im DHBWV6-Netz ist eine private NAT-Adresse (10.200.x.x). Deshalb
+  # geben die outputs fixed_ip_v6 als Verbindungsziel aus.
   enable_floating_ip = false
 
   metadata = {}
