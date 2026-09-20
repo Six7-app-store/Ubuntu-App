@@ -14,19 +14,21 @@ packages:
   - openssl
   - net-tools
 
-# Gruppen für jedes Team erstellen
+# Gruppen für jedes Team erstellen.
+# jsonencode() setzt jeden Wert in Anfuehrungszeichen: ohne das wuerde YAML
+# "Team #1" am Leerzeichen-# abschneiden und alle Teams zu "Team" verschmelzen.
 groups:
-%{ for team in unique_teams ~}
-  - ${team}
+%{ for group in unique_groups ~}
+  - ${jsonencode(group)}
 %{ endfor ~}
 
 # Benutzer erstellen
 users:
 %{ for idx, user in all_users ~}
-  - name: ${user.username}
+  - name: ${jsonencode(user.username)}
     shell: /bin/bash
     sudo: ['ALL=(ALL) ALL']
-    groups: ${user.team}
+    groups: ${jsonencode(user.group)}
     lock_passwd: false
 %{ endfor ~}
 
@@ -41,21 +43,24 @@ write_files:
     permissions: '0644'
 
 # Setup-Befehle
+# Passwoerter zwingend ueber jsonencode(): ein Passwort, das mit ! @ % oder *
+# beginnt, ist als unquotierter YAML-Skalar ein Syntaxfehler und liesse das
+# komplette user-data scheitern - die VM liefe dann ganz ohne Benutzer.
 chpasswd:
   expire: false
   users:
 %{ for idx, user in all_users ~}
-    - name: ${user.username}
-      password: ${passwords[idx]}
+    - name: ${jsonencode(user.username)}
+      password: ${jsonencode(passwords[idx])}
       type: text
 %{ endfor ~}
 
 runcmd:
-  - systemctl restart sshd
+  - systemctl restart ssh
   
-  # Optional: Firewall
-  - ufw --force enable
+  # Firewall: erst SSH freigeben, dann einschalten (nicht umgekehrt)
   - ufw allow OpenSSH
+  - ufw --force enable
   
   # Setup-Log (OHNE Passwörter aus Sicherheitsgründen)
   - |
