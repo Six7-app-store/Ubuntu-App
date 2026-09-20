@@ -50,19 +50,37 @@ locals {
 
 # Flatten users from teams - EXAKT wie im Contract vorgegeben
 locals {
+  # Team -> Linux-Gruppenname. Gruppen muessen mit einem Buchstaben beginnen,
+  # daher das Praefix fuer Teams, die mit einer Ziffer anfangen.
+  group_names = {
+    for team in keys(var.users) : team => (
+      can(regex("^[a-z]", trim(replace(lower(team), "/[^a-z0-9_-]+/", "-"), "-")))
+      ? trim(replace(lower(team), "/[^a-z0-9_-]+/", "-"), "-")
+      : "t-${trim(replace(lower(team), "/[^a-z0-9_-]+/", "-"), "-")}"
+    )
+  }
+
   all_users = flatten([
     for team, members in var.users : [
       for member in members : {
         id       = "${team}-${replace(split("@", member.email)[0], ".", "-")}"
         team     = team
         email    = member.email
-        username = replace(split("@", member.email)[0], ".", "")
+        username = lower(replace(split("@", member.email)[0], ".", ""))
+
+        # Linux-Gruppenname. "Team #1" ist als Gruppe unzulaessig (Grossbuchstabe,
+        # Leerzeichen, '#'), deshalb auf [a-z0-9_-] herunterbrechen: "team-1".
+        # Der huebsche Name bleibt in team/metadata/outputs erhalten.
+        group = local.group_names[team]
       }
     ]
   ])
 
   # Eindeutige Teams extrahieren
   unique_teams = distinct([for user in local.all_users : user.team])
+
+  # Dieselben Teams als Linux-Gruppennamen
+  unique_groups = distinct([for user in local.all_users : user.group])
 
   # VM-Anzahl = 1 (eine gemeinsame VM)
   vm_count = 1
@@ -93,7 +111,8 @@ data "openstack_images_image_v2" "image" {
 
 # External network nur nötig, wenn Floating IP aktiviert ist
 data "openstack_networking_network_v2" "external" {
-  name = var.floating_ip_pool
+  count = local.enable_floating_ip ? 1 : 0
+  name  = var.floating_ip_pool
 }
 
 # -----------------------------------------------------------------------------
@@ -117,9 +136,10 @@ resource "openstack_compute_instance_v2" "shared_vm" {
   }
 
   user_data = templatefile("${path.module}/cloud-init-multi-user.yml.tpl", {
-    all_users    = local.all_users
-    unique_teams = local.unique_teams
-    passwords    = [for p in random_password.user_passwords : p.result]
+    all_users     = local.all_users
+    unique_teams  = local.unique_teams
+    unique_groups = local.unique_groups
+    passwords     = [for p in random_password.user_passwords : p.result]
   })
 
   metadata = merge(local.metadata, {
@@ -134,14 +154,15 @@ resource "openstack_compute_instance_v2" "shared_vm" {
 # -----------------------------------------------------------------------------
 resource "openstack_networking_floatingip_v2" "fip" {
   count = local.enable_floating_ip ? 1 : 0
-  pool  = data.openstack_networking_network_v2.external.name
+  pool  = data.openstack_networking_network_v2.external[0].name
 }
 
-# Warten bis VM vollständig gebootet ist
+# Warten bis cloud-init die Benutzer angelegt hat. Ohne das meldet Terraform
+# fertig, sobald die Instanz ACTIVE ist - die Zugangsdaten gehen dann raus,
+# bevor der Login funktioniert.
 resource "time_sleep" "wait_for_vm" {
-  count           = local.enable_floating_ip ? 1 : 0
   depends_on      = [openstack_compute_instance_v2.shared_vm]
-  create_duration = "60s"
+  create_duration = "90s"
 }
 
 # Port-ID der VM finden
