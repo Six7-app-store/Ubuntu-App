@@ -36,12 +36,72 @@ locals {
   # aber nicht zuweisen - zwischen VM-Subnetz und externem Netz fehlt
   # der Router ("External network ... is not reachable from subnet").
   #
-  # Oeffentlich erreichbar ist die Instanz ueber IPv6; die feste IPv4
-  # im DHBWV6-Netz ist eine private NAT-Adresse (10.200.x.x). Deshalb
-  # geben die outputs fixed_ip_v6 als Verbindungsziel aus.
+  # Erreichbar ist die Instanz ueber die feste Adresse der gewaehlten
+  # Familie (var.ip_mode). Die IPv4 im DHBWV6-Netz ist eine private
+  # NAT-Adresse (10.200.x.x) und taugt nicht als Verbindungsziel -
+  # oeffentliches IPv4 kommt nur aus einem eigenen IPv4-Netz wie DHBWv4.
   enable_floating_ip = false
 
   metadata = {}
+}
+
+############################
+# ADRESSFAMILIEN (var.ip_mode)
+############################
+
+locals {
+  ethertypes = {
+    ipv4 = ["IPv4"]
+    ipv6 = ["IPv6"]
+    dual = ["IPv4", "IPv6"]
+  }[var.ip_mode]
+
+  # Hauptschnittstelle. Bei dual liegt sie im IPv6-Netz: dessen private
+  # IPv4 bringt den Weg nach draussen (Paketquellen, GitHub) ueber NAT mit,
+  # und das oeffentliche IPv4 kommt als zweite Schnittstelle dazu.
+  primary_network_id = var.ip_mode == "ipv4" ? var.network_v4_uuid : var.network_v6_uuid
+
+  dual = var.ip_mode == "dual"
+}
+
+# SSH je Adressfamilie. Die gemeinsame Security Group bleibt zusaetzlich
+# dran; sie ist ausserhalb dieses Templates gepflegt und muss nicht fuer
+# beide Familien Regeln haben.
+resource "openstack_networking_secgroup_v2" "ssh" {
+  name        = "${local.app_name}-ssh"
+  description = "SSH zur gemeinsamen VM (${var.ip_mode})"
+}
+
+resource "openstack_networking_secgroup_rule_v2" "ssh" {
+  for_each = toset(local.ethertypes)
+
+  security_group_id = openstack_networking_secgroup_v2.ssh.id
+  direction         = "ingress"
+  ethertype         = each.key
+  protocol          = "tcp"
+  port_range_min    = 22
+  port_range_max    = 22
+  remote_ip_prefix  = each.key == "IPv4" ? "0.0.0.0/0" : "::/0"
+  description       = "SSH (${each.key})"
+}
+
+# Zweite Schnittstelle fuer dual, vorab als Port angelegt: so sind MAC und
+# Adresse schon bekannt, wenn cloud-init sein user-data bekommt.
+resource "openstack_networking_port_v2" "v4" {
+  count      = local.dual ? 1 : 0
+  name       = "${local.app_name}-shared-v4"
+  network_id = var.network_v4_uuid
+
+  security_group_ids = [
+    var.shared_secgroup_id,
+    openstack_networking_secgroup_v2.ssh.id,
+  ]
+}
+
+locals {
+  secondary_ipv4 = local.dual ? [
+    for ip in openstack_networking_port_v2.v4[0].all_fixed_ips : ip if length(regexall(":", ip)) == 0
+  ][0] : ""
 }
 
 ############################
@@ -124,29 +184,68 @@ resource "openstack_compute_instance_v2" "shared_vm" {
   flavor_name = local.flavor
   key_pair    = local.key_pair != "" ? local.key_pair : null
 
-  security_groups = [var.shared_secgroup_id]
+  security_groups = [var.shared_secgroup_id, openstack_networking_secgroup_v2.ssh.id]
 
   timeouts {
     create = "15m"
     delete = "15m"
   }
 
+  # Nur die Hauptschnittstelle. Die zweite bei dual haengt
+  # interface_attach unten an: als zweiter network-Block wuerde cloud-init
+  # sie beim ersten Boot mit einer eigenen Default-Route einrichten, und
+  # zwei Default-Routen in der Haupttabelle schicken Antworten ueber die
+  # falsche Schnittstelle hinaus.
   network {
-    uuid = var.network_uuid
+    uuid = local.primary_network_id
   }
 
   user_data = templatefile("${path.module}/cloud-init-multi-user.yml.tpl", {
-    all_users     = local.all_users
-    unique_teams  = local.unique_teams
-    unique_groups = local.unique_groups
-    passwords     = [for p in random_password.user_passwords : p.result]
+    all_users      = local.all_users
+    unique_teams   = local.unique_teams
+    unique_groups  = local.unique_groups
+    passwords      = [for p in random_password.user_passwords : p.result]
+    secondary_mac  = local.dual ? openstack_networking_port_v2.v4[0].mac_address : ""
+    secondary_ipv4 = local.secondary_ipv4
   })
+
+  lifecycle {
+    precondition {
+      condition     = var.ip_mode == "ipv6" || var.network_v4_uuid != ""
+      error_message = "ip_mode \"${var.ip_mode}\" braucht ein IPv4-Netz in network_v4_uuid."
+    }
+    precondition {
+      condition     = var.ip_mode == "ipv4" || var.network_v6_uuid != ""
+      error_message = "ip_mode \"${var.ip_mode}\" braucht ein IPv6-Netz in network_v6_uuid."
+    }
+  }
 
   metadata = merge(local.metadata, {
     teams  = join(",", local.unique_teams)
     users  = join(",", local.usernames)
     emails = join(",", local.emails)
   })
+}
+
+# Zweite Schnittstelle (dual) an die laufende Instanz. Eingerichtet wird sie
+# von cloud-init, das auf ihre MAC wartet - siehe runcmd im Template.
+resource "openstack_compute_interface_attach_v2" "v4" {
+  count       = local.dual ? 1 : 0
+  instance_id = openstack_compute_instance_v2.shared_vm.id
+  port_id     = openstack_networking_port_v2.v4[0].id
+}
+
+locals {
+  ipv4_address = (
+    var.ip_mode == "ipv4" ? openstack_compute_instance_v2.shared_vm.network[0].fixed_ip_v4
+    : local.dual ? local.secondary_ipv4
+    : null
+  )
+  ipv6_address = var.ip_mode == "ipv4" ? null : openstack_compute_instance_v2.shared_vm.network[0].fixed_ip_v6
+
+  # Verbindungsziel fuer die Zugangsdaten. Bei dual IPv4, weil es mehr
+  # Heimnetze erreicht; die IPv6 steht in team_vms daneben.
+  access_ip = try(coalesce(local.ipv4_address, local.ipv6_address), null)
 }
 
 # -----------------------------------------------------------------------------
@@ -161,14 +260,18 @@ resource "openstack_networking_floatingip_v2" "fip" {
 # fertig, sobald die Instanz ACTIVE ist - die Zugangsdaten gehen dann raus,
 # bevor der Login funktioniert.
 resource "time_sleep" "wait_for_vm" {
-  depends_on      = [openstack_compute_instance_v2.shared_vm]
+  depends_on = [
+    openstack_compute_instance_v2.shared_vm,
+    openstack_compute_interface_attach_v2.v4,
+  ]
   create_duration = "90s"
 }
 
 # Port-ID der VM finden
 data "openstack_networking_port_v2" "vm_port" {
-  count     = local.enable_floating_ip ? 1 : 0
-  device_id = openstack_compute_instance_v2.shared_vm.id
+  count      = local.enable_floating_ip ? 1 : 0
+  device_id  = openstack_compute_instance_v2.shared_vm.id
+  network_id = local.primary_network_id
   depends_on = [
     openstack_compute_instance_v2.shared_vm,
     time_sleep.wait_for_vm

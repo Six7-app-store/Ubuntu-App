@@ -41,6 +41,31 @@ write_files:
       PermitRootLogin no
       UsePAM yes
     permissions: '0644'
+%{ if secondary_mac != "" ~}
+
+  # ip_mode = dual: die IPv4-Schnittstelle, die Terraform nach dem Boot
+  # anhaengt. Ihre DHCP-Routen gehen in eine eigene Tabelle, und nur
+  # Pakete mit ihrer Adresse als Absender nehmen diese Tabelle. Ohne das
+  # gingen Antworten ueber die Default-Route der Hauptschnittstelle hinaus,
+  # und Neutrons Port-Security verwirft sie als gefaelschten Absender.
+  - path: /etc/netplan/60-secondary-ipv4.yaml
+    permissions: '0600'
+    content: |
+      network:
+        version: 2
+        ethernets:
+          secondary:
+            match:
+              macaddress: "${secondary_mac}"
+            dhcp4: true
+            dhcp6: false
+            accept-ra: false
+            dhcp4-overrides:
+              route-table: 100
+            routing-policy:
+              - from: "${secondary_ipv4}"
+                table: 100
+%{ endif ~}
 
 # Setup-Befehle
 # Passwoerter zwingend ueber jsonencode(): ein Passwort, das mit ! @ % oder *
@@ -57,7 +82,21 @@ chpasswd:
 
 runcmd:
   - systemctl restart ssh
-  
+%{ if secondary_mac != "" ~}
+
+  # Die IPv4-Schnittstelle kommt erst nach dem Boot dazu (interface_attach).
+  # Bis zu fuenf Minuten auf ihre MAC warten, dann die netplan-Datei oben
+  # anwenden. Kommt sie nicht, bleibt die VM ueber IPv6 erreichbar.
+  - |
+    for i in $(seq 1 60); do
+      if ip -o link | grep -qi "${secondary_mac}"; then
+        netplan apply
+        break
+      fi
+      sleep 5
+    done
+%{ endif ~}
+
   # Firewall: erst SSH freigeben, dann einschalten (nicht umgekehrt)
   - ufw allow OpenSSH
   - ufw --force enable

@@ -19,8 +19,32 @@ variable "image_name" {
 # Konfigurierbare Variablen
 ################################################
 
-variable "network_uuid" {
-  description = "Hauptnetzwerk @openstack:network:id"
+# Welche Adressfamilie die Instanz nach aussen anbietet. Waehlt das Netz und
+# legt die Security-Group-Regeln an - je Familie eine eigene Regel, denn eine
+# IPv4-Regel laesst kein einziges IPv6-Paket durch und umgekehrt.
+#
+#   ipv4  eine Schnittstelle im IPv4-Netz (network_v4_uuid)
+#   ipv6  eine Schnittstelle im IPv6-Netz (network_v6_uuid)
+#   dual  IPv6-Netz als Hauptschnittstelle, dazu eine zweite im IPv4-Netz
+variable "ip_mode" {
+  description = "Adressfamilie: ipv4, ipv6 oder dual (beide)"
+  type        = string
+  default     = "ipv6"
+
+  validation {
+    condition     = contains(["ipv4", "ipv6", "dual"], var.ip_mode)
+    error_message = "ip_mode muss \"ipv4\", \"ipv6\" oder \"dual\" sein."
+  }
+}
+
+variable "network_v4_uuid" {
+  description = "Netz mit oeffentlich gerouteter IPv4, z. B. DHBWv4 - fuer ipv4 und dual @openstack:network:id"
+  type        = string
+  default     = ""
+}
+
+variable "network_v6_uuid" {
+  description = "Netz mit oeffentlicher IPv6, z. B. DHBWV6 - fuer ipv6 und dual @openstack:network:id"
   type        = string
   default     = "9b579624-d844-4df3-b38d-89978b31d37d"
 }
