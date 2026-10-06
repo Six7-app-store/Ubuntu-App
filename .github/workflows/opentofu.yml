@@ -1,0 +1,58 @@
+# Prueft nur Formatierung, Syntax und Sicherheit (fmt, validate, tflint, tfsec).
+# Kein plan/apply: das Ausrollen uebernimmt der App-Store-Worker.
+
+name: 'OpenTofu'
+
+on:
+  push:
+  pull_request:
+    branches: [ "main" ]
+  release:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  opentofu:
+    name: 'OpenTofu'
+    runs-on: ubuntu-latest
+    environment: production
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: terraform
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup OpenTofu
+      uses: opentofu/setup-opentofu@v1
+
+    - name: OpenTofu Init
+      run: tofu init -backend=false
+
+    - name: OpenTofu Format
+      run: tofu fmt -check
+
+    - name: OpenTofu Validate
+      run: tofu validate
+
+    - name: Setup TFLint
+      uses: terraform-linters/setup-tflint@v4
+      with:
+        tflint_version: latest
+
+    - name: Init TFLint
+      run: tflint --init
+
+    - name: Run TFLint
+      run: tflint --recursive
+
+    - name: Run tfsec
+      uses: aquasecurity/tfsec-action@v1.0.3
+      with:
+        working_directory: terraform
+        soft_fail: false

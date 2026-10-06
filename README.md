@@ -90,10 +90,10 @@ Jeder Nutzer findet nach dem Login unter `~/linux-kurs/` folgende Struktur vor:
 
 | Packer Image Build | 10–15 min |
 
-| Terraform apply | 3–5 min |
+| OpenTofu apply | 3–5 min |
 
 | **Gesamt (Erstdeployment)** | **13–20 min** |
  
-Bei Folge-Deployments (Image bereits gebaut) nur Terraform: **3–5 min**.
+Bei Folge-Deployments (Image bereits gebaut) nur OpenTofu: **3–5 min**.
 
  
