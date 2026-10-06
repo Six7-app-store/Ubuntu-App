@@ -18,15 +18,19 @@ erprobt.
 | `terraform/cloud-init-multi-user.yml.tpl` | **Was beim ersten Start passiert** — Konten, Verzeichnisse, Dienste |
 | `terraform/outputs.tf` | Was der Studierende als Zugangsdaten zu sehen bekommt |
 
+Die VM wird mit **OpenTofu** (`tofu`) ausgerollt, dem quelloffenen Fork von
+Terraform. Die Sprache (HCL) und die Dateien sind identisch. Der Ordner heißt
+deshalb weiterhin `terraform/`, damit der App-Store-Worker ihn findet.
+
 Die Kette dahinter:
 
 ```
-Packer baut ein Image  →  Terraform erzeugt daraus eine VM
-                       →  Terraform übergibt user_data
+Packer baut ein Image  →  OpenTofu erzeugt daraus eine VM
+                       →  OpenTofu übergibt user_data
                        →  cloud-init richtet beim ersten Boot alles ein
 ```
 
-**Terraform legt keine Nutzer an.** Es reicht nur einen Zettel (`user_data`) an
+**OpenTofu legt keine Nutzer an.** Es reicht nur einen Zettel (`user_data`) an
 die VM weiter. Wer ihn abarbeitet, ist cloud-init *innerhalb* der VM. Das ist
 die wichtigste Stelle zum Verstehen — und der Grund, warum Windows-Images
 zusätzlich `cloudbase-init` brauchen.
@@ -48,8 +52,9 @@ dieser Dateien lokal — nur ein Git-Repo, auf das der App Store zeigt.
 4. **Deployment starten** — der Assistent führt durch Konfiguration, Teams und
    Variablen.
 
-Der Worker erledigt dann: Repo klonen → `packer build` → `terraform apply` →
-Zugangsdaten je Studierendem ausgeben.
+Der Worker erledigt dann: Repo klonen → `packer build` → `tofu apply` →
+Zugangsdaten je Studierendem ausgeben. Voraussetzung: Auf dem Worker ist
+OpenTofu ab Version 1.6 installiert.
 
 **Wichtig:** Das App-Repo hat bewusst keinen Deploy-Knopf. Die enthaltenen
 GitHub-Workflows prüfen nur Formatierung und Syntax (`fmt`, `validate`,
@@ -66,7 +71,7 @@ zu durchlaufen.
 
 ### Voraussetzungen
 
-- `packer` und `terraform`
+- `packer` und `tofu` (OpenTofu ≥ 1.6, z. B. `winget install OpenTofu.Tofu`)
 - Eine `clouds.yaml` unter `~/.config/openstack/clouds.yaml`
 - Campusnetz oder VPN — die OpenStack-API ist von außen nicht erreichbar
 
@@ -111,15 +116,15 @@ verschachtelte Struktur ist — deshalb die Datei.
 
 ```bash
 cd ../terraform
-terraform init
-terraform plan      # zeigt, was entstehen würde, ändert nichts
-terraform apply
+tofu init
+tofu plan      # zeigt, was entstehen würde, ändert nichts
+tofu apply
 ```
 
 ### Schritt 3: Zugangsdaten auslesen
 
 ```bash
-terraform output -json user_accounts
+tofu output -json user_accounts
 ```
 
 Darin stehen Benutzername, Passwort und die IPv6-Adresse. Verbinden:
@@ -131,7 +136,7 @@ ssh benutzername@2001:7c0:1b20:...
 ### Schritt 4: Wieder abräumen
 
 ```bash
-terraform destroy
+tofu destroy
 ```
 
 **Nicht vergessen** — eine vergessene VM verbraucht weiter Quota. Das gebaute
@@ -191,8 +196,8 @@ zwischen VM-Subnetz und externem Netz fehlt ein Router. Deshalb
 `enable_floating_ip = false`.
 
 **Der Image-Name muss übereinstimmen.** Was bei `packer build` als
-`image_name` gesetzt wird, muss in Terraform dasselbe sein — sonst findet
-Terraform das Image nicht.
+`image_name` gesetzt wird, muss in OpenTofu dasselbe sein — sonst findet
+OpenTofu das Image nicht.
 
 **Build-Zeit.** Der App Store bricht einen Packer-Build nach **einer Stunde**
 hart ab (`SIGKILL`). Linux-Images bleiben mit 10–15 Minuten weit darunter. Bei

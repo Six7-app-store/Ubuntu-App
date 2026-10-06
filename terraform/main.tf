@@ -1,5 +1,7 @@
+# OpenTofu erwartet weiterhin das Schluesselwort "terraform"; die Provider
+# werden ueber registry.opentofu.org aufgeloest.
 terraform {
-  required_version = ">= 1.0"
+  required_version = ">= 1.6"
 
   required_providers {
     openstack = {
@@ -157,7 +159,7 @@ resource "openstack_networking_floatingip_v2" "fip" {
   pool  = data.openstack_networking_network_v2.external[0].name
 }
 
-# Warten bis cloud-init die Benutzer angelegt hat. Ohne das meldet Terraform
+# Warten bis cloud-init die Benutzer angelegt hat. Ohne das meldet OpenTofu
 # fertig, sobald die Instanz ACTIVE ist - die Zugangsdaten gehen dann raus,
 # bevor der Login funktioniert.
 resource "time_sleep" "wait_for_vm" {
