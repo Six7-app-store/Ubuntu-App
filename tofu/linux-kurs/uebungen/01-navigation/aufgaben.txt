@@ -1,0 +1,24 @@
+ÜBUNG 1 – Navigation im Dateisystem
+====================================
+
+Aufgabe 1: Wo bin ich?
+  Finde heraus, in welchem Verzeichnis du dich gerade befindest.
+  Befehl: pwd
+
+Aufgabe 2: Was ist hier drin?
+  Liste den Inhalt deines Home-Verzeichnisses auf — auch versteckte Dateien.
+  Befehl: ls -la ~
+
+Aufgabe 3: Wechseln
+  a) Wechsle in das Verzeichnis /tmp
+  b) Gehe zurück in dein Home-Verzeichnis
+  c) Wechsle in das linux-kurs-Verzeichnis ohne den vollen Pfad zu schreiben
+  Befehl: cd, cd ~, cd -
+
+Aufgabe 4: Verzeichnisbaum
+  Zeige die Struktur des linux-kurs-Verzeichnisses als Baum an.
+  Befehl: tree ~/linux-kurs
+
+Aufgabe 5: Pfade erkunden
+  Was steht in /etc? Was in /var/log?
+  Befehl: ls /etc | head -20

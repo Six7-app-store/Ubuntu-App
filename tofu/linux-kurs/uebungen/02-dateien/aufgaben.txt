@@ -1,0 +1,28 @@
+ÜBUNG 2 – Dateien und Verzeichnisse
+=====================================
+
+Aufgabe 1: Erstellen
+  Erstelle im Ordner uebungen/02-dateien/:
+  a) Eine leere Datei namens "notizen.txt"
+  b) Einen Unterordner "entwuerfe"
+  c) Die Ordnerstruktur "projekte/web/css" in einem Befehl
+  Befehle: touch, mkdir, mkdir -p
+
+Aufgabe 2: Inhalt schreiben
+  Schreibe "Mein erster Linux-Text" in notizen.txt.
+  Hänge eine zweite Zeile "Zweite Zeile" an die Datei an.
+  Befehle: echo "..." > datei, echo "..." >> datei
+
+Aufgabe 3: Lesen
+  Zeige den Inhalt von notizen.txt an.
+  Befehl: cat notizen.txt
+
+Aufgabe 4: Kopieren und verschieben
+  a) Kopiere notizen.txt als "notizen_backup.txt" in den Ordner "entwuerfe/"
+  b) Benenne notizen.txt in "meine_notizen.txt" um
+  Befehle: cp, mv
+
+Aufgabe 5: Aufräumen
+  Lösche den Ordner "entwuerfe/" mitsamt Inhalt.
+  Befehl: rm -r entwuerfe/
+  ACHTUNG: rm löscht unwiderruflich — kein Papierkorb!

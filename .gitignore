@@ -1,14 +1,9 @@
-# OpenTofu files (gleiche Dateinamen wie bei Terraform)
+# OpenTofu (Namen wie OpenTofu sie selbst vergibt)
 .terraform/
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
-terraform.tfvars
-
-# Packer files
-packer_cache/
-*.box
-*.pkrvars.hcl
+*.tfvars
 
 # OS files
 .DS_Store

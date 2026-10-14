@@ -1,0 +1,32 @@
+ÜBUNG 5 – Textverarbeitung und Pipes
+======================================
+
+Aufgabe 1: Suchen mit grep
+  Suche in /etc/passwd nach deinem Benutzernamen.
+  Befehl: grep "$(whoami)" /etc/passwd
+
+Aufgabe 2: Zeilen zählen
+  Wie viele Benutzer gibt es auf dem System?
+  Befehl: wc -l /etc/passwd
+
+Aufgabe 3: Sortieren
+  Erstelle eine Datei "zahlen.txt" mit folgenden Zeilen:
+    42
+    7
+    100
+    3
+    55
+  Sortiere die Datei numerisch.
+  Befehle: nano zahlen.txt, sort -n zahlen.txt
+
+Aufgabe 4: Pipes kombinieren
+  Zeige die 5 größten Dateien im /var/log-Verzeichnis.
+  Befehl: du -sh /var/log/* 2>/dev/null | sort -rh | head -5
+
+Aufgabe 5: Text ersetzen mit sed
+  Ersetze in einer Textdatei das Wort "alt" durch "neu".
+  Befehl: sed 's/alt/neu/g' datei.txt
+
+Aufgabe 6 (Bonus): Log-Analyse
+  Zeige die letzten 100 Systemlog-Einträge und filtere nach "error".
+  Befehl: journalctl -n 100 | grep -i "error"

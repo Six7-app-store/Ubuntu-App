@@ -10,25 +10,27 @@ erprobt.
 
 | Datei | Aufgabe |
 |---|---|
-| `packer/template.pkr.hcl` | Beschreibt, wie das Image gebaut wird: Basis-Image, Flavor, Netz |
-| `packer/variables.pkr.hcl` | Die Stellschrauben des Builds |
-| `packer/scripts/provision.sh` | **Was installiert wird** — hier steckt der Inhalt deiner App |
-| `terraform/main.tf` | Erzeugt die VM aus dem gebauten Image |
-| `terraform/variables.tf` | Netz, Security Group, Nutzerliste |
-| `terraform/cloud-init-multi-user.yml.tpl` | **Was beim ersten Start passiert** — Konten, Verzeichnisse, Dienste |
-| `terraform/outputs.tf` | Was der Studierende als Zugangsdaten zu sehen bekommt |
+| `tofu/main.tofu` | Erzeugt die VM: Image, Größe, Netz, optional ein Boot-Volume |
+| `tofu/variables.tofu` | Was im Wizard einstellbar ist: Größe, Platte, Netz, Security Group |
+| `tofu/cloud-init.tofu` | **Was beim ersten Start passiert** — Pakete, Konten, Dateien, Dienste |
+| `tofu/linux-kurs/` | Das Lernverzeichnis, das jeder Nutzer im Home-Ordner bekommt |
+| `tofu/outputs.tofu` | Was der Studierende als Zugangsdaten zu sehen bekommt |
+| `tofu/tests/` | `tofu test` mit gemockten Providern — prüft ohne OpenStack-Zugang |
 
-Die VM wird mit **OpenTofu** (`tofu`) ausgerollt, dem quelloffenen Fork von
-Terraform. Die Sprache (HCL) und die Dateien sind identisch. Der Ordner heißt
-deshalb weiterhin `terraform/`, damit der App-Store-Worker ihn findet.
+Die VM wird mit **OpenTofu** (`tofu`) ausgerollt. Der App Store erwartet
+genau einen Ordner `tofu/` mit `*.tofu`-Dateien; ein Repo mit `packer/` oder
+`terraform/` lehnt er ab (ADR 0010 im deployment-Repo).
 
 Die Kette dahinter:
 
 ```
-Packer baut ein Image  →  OpenTofu erzeugt daraus eine VM
-                       →  OpenTofu übergibt user_data
-                       →  cloud-init richtet beim ersten Boot alles ein
+OpenTofu erzeugt die VM aus dem Basis-Image "Ubuntu 24.04"
+  →  OpenTofu übergibt user_data
+  →  cloud-init richtet beim ersten Boot alles ein
 ```
+
+Ein eigenes Image wird nicht mehr gebaut. Was früher Packer vorinstalliert
+hat, installiert cloud-init jetzt bei jedem Start.
 
 **OpenTofu legt keine Nutzer an.** Es reicht nur einen Zettel (`user_data`) an
 die VM weiter. Wer ihn abarbeitet, ist cloud-init *innerhalb* der VM. Das ist
@@ -47,20 +49,20 @@ dieser Dateien lokal — nur ein Git-Repo, auf das der App Store zeigt.
    Schritt passiert nichts, denn der Worker rollt im Projekt des jeweiligen
    Nutzers aus.
 2. **App registrieren** — Git-URL und Release angeben, z. B.
-   `https://github.com/Six7-app-store/Ubuntu-App` mit Release `v1.1.1`.
+   `https://github.com/Six7-app-store/Ubuntu-App` mit einem Release ab `v2.0.0`
+   (frühere Releases haben noch `terraform/` und werden abgelehnt).
 3. **Freigeben** — über die Admin-Seite unter `/admin/apps`.
 4. **Deployment starten** — der Assistent führt durch Konfiguration, Teams und
-   Variablen.
+   Variablen. Größe und Festplatte der VM sind dort wählbar.
 
-Der Worker erledigt dann: Repo klonen → `packer build` → `tofu apply` →
-Zugangsdaten je Studierendem ausgeben. Voraussetzung: Auf dem Worker ist
-OpenTofu ab Version 1.6 installiert.
+Der Worker erledigt dann: Repo klonen → `tofu apply` → Zugangsdaten je
+Studierendem ausgeben.
 
-**Wichtig:** Das App-Repo hat bewusst keinen Deploy-Knopf. Die enthaltenen
-GitHub-Workflows prüfen nur Formatierung und Syntax (`fmt`, `validate`,
-`tflint`, `tfsec`) — sie fassen OpenStack nicht an, und sie enthalten keine
-Zugangsdaten. Müsste jedes App-Repo selbst ausrollen können, bräuchte es die
-Zugangsdaten jedes Kurses.
+**Wichtig:** Das App-Repo hat bewusst keinen Deploy-Knopf. Der enthaltene
+GitHub-Workflow prüft nur Formatierung, Syntax und das Verhalten mit
+gemockten Providern (`fmt`, `validate`, `test`) — er fasst OpenStack nicht an
+und enthält keine Zugangsdaten. Müsste jedes App-Repo selbst ausrollen
+können, bräuchte es die Zugangsdaten jedes Kurses.
 
 ---
 
@@ -71,7 +73,7 @@ zu durchlaufen.
 
 ### Voraussetzungen
 
-- `packer` und `tofu` (OpenTofu ≥ 1.6, z. B. `winget install OpenTofu.Tofu`)
+- `tofu` (OpenTofu ≥ 1.13, z. B. `winget install OpenTofu.Tofu`)
 - Eine `clouds.yaml` unter `~/.config/openstack/clouds.yaml`
 - Campusnetz oder VPN — die OpenStack-API ist von außen nicht erreichbar
 
@@ -79,30 +81,24 @@ zu durchlaufen.
 export OS_CLOUD=openstack
 ```
 
-Beide Werkzeuge lesen die Zugangsdaten über `cloud = "openstack"` aus dieser
-Datei. Es müssen keine Passwörter in die Vorlagen.
+OpenTofu liest die Zugangsdaten über `cloud = "openstack"` aus dieser Datei.
+Es müssen keine Passwörter in die Vorlagen.
 
-### Schritt 1: Image bauen
-
-```bash
-cd packer
-packer init .
-packer build -var image_name=meine-app-v1 .
-```
-
-Dauert bei Linux etwa 10–15 Minuten. Am Ende liegt ein neues Image namens
-`meine-app-v1` in OpenStack. Prüfen mit:
+### Schritt 0: Ohne OpenStack prüfen
 
 ```bash
-openstack image list --private
+cd tofu
+tofu init
+tofu test      # gemockte Provider, legt nichts an
 ```
 
-### Schritt 2: VM erzeugen
+### Schritt 1: VM erzeugen
 
-Lege eine Datei `terraform/meine.auto.tfvars` an:
+Lege eine Datei `tofu/meine.auto.tfvars` an:
 
 ```hcl
-image_name = "meine-app-v1"
+flavor       = "gp1.medium"
+disk_size_gb = 20
 
 users = {
   "Team 1" = [
@@ -115,13 +111,11 @@ Der Name auf der Kommandozeile wäre schwer zu tippen, weil `users` eine
 verschachtelte Struktur ist — deshalb die Datei.
 
 ```bash
-cd ../terraform
-tofu init
 tofu plan      # zeigt, was entstehen würde, ändert nichts
 tofu apply
 ```
 
-### Schritt 3: Zugangsdaten auslesen
+### Schritt 2: Zugangsdaten auslesen
 
 ```bash
 tofu output -json user_accounts
@@ -133,18 +127,17 @@ Darin stehen Benutzername, Passwort und die IPv6-Adresse. Verbinden:
 ssh benutzername@2001:7c0:1b20:...
 ```
 
-### Schritt 4: Wieder abräumen
+Die Einrichtung läuft nach dem Boot noch einige Minuten weiter; fertig ist
+sie, sobald `/var/log/setup-complete.log` existiert.
+
+### Schritt 3: Wieder abräumen
 
 ```bash
 tofu destroy
 ```
 
-**Nicht vergessen** — eine vergessene VM verbraucht weiter Quota. Das gebaute
-Image bleibt davon unberührt und muss separat gelöscht werden:
-
-```bash
-openstack image delete meine-app-v1
-```
+**Nicht vergessen** — eine vergessene VM verbraucht weiter Quota. Ein
+Boot-Volume (bei `disk_size_gb` > 0) verschwindet mit der VM.
 
 ---
 
@@ -152,21 +145,32 @@ openstack image delete meine-app-v1
 
 Drei Stellen, mehr braucht es meistens nicht:
 
-**`packer/scripts/provision.sh`** — was installiert wird. Ein normales
-Shell-Skript, das beim Build in der VM läuft. Hier kommt deine Software hinein.
+**`tofu/cloud-init.tofu`** — was beim ersten Start jeder VM passiert:
+Pakete (`packages`), Konten, Dateien (`write_files`), Befehle (`runcmd`).
+Hier kommt deine Software hinein. Die Konfiguration wird mit `yamlencode`
+gebaut; Werte müssen deshalb nicht von Hand gequotet werden.
 
-**`terraform/cloud-init-multi-user.yml.tpl`** — was beim ersten Start jeder VM
-passiert: Konten anlegen, Dienste starten, Dateien schreiben.
-
-**`terraform/outputs.tf`** — was der Studierende angezeigt bekommt. Der Block
+**`tofu/outputs.tofu`** — was der Studierende angezeigt bekommt. Der Block
 `user_accounts` ist als `[CONTRACT]` markiert: Der App Store erwartet diese
 Struktur, also die Felder beibehalten und nur die Werte anpassen.
 
-Dazu in `terraform/main.tf` unter `locals` die App-Vorgaben:
+**`tofu/variables.tofu`** — was im Wizard wählbar ist. Ein
+`validation`-Block bestimmt die Auswahl:
 
 ```hcl
-app_name = "ubuntu-user"   # Namenspräfix der VM
-flavor   = "gp1.small"     # Größe
+validation {
+  condition = contains(["gp1.small", "gp1.large"], var.flavor)   # nur diese im Wizard
+}
+validation {
+  condition = var.disk_size_gb >= 0 && var.disk_size_gb <= 200    # min/max im Wizard
+}
+```
+
+Dazu in `tofu/main.tofu` unter `locals` die App-Vorgaben:
+
+```hcl
+app_name   = "ubuntu-user"    # Namenspräfix der VM
+image_name = "Ubuntu 24.04"   # Basis-Image
 ```
 
 ---
@@ -174,9 +178,8 @@ flavor   = "gp1.small"     # Größe
 ## 5. Stolpersteine, die uns tatsächlich passiert sind
 
 **Basis-Image.** Die Vorlage suchte ursprünglich `Ubuntu 22.04`, das es auf
-newstack nicht mehr gibt — der Build brach nach 327 Millisekunden ab. Jetzt ist
-es die Variable `source_image_name` mit Default `Ubuntu 24.04`. Vorhanden sind
-`Ubuntu 24.04` und `Ubuntu Server 26.04 LTS`.
+newstack nicht mehr gibt. Vorhanden sind `Ubuntu 24.04` und
+`Ubuntu Server 26.04 LTS`; die App nutzt `Ubuntu 24.04`.
 
 **Fest verdrahtete UUIDs.** Netz und Security Group standen als UUIDs der alten
 Cloud in den Defaults. Korrigiert auf:
@@ -195,11 +198,12 @@ fehlerfrei durchlief. Jetzt `fixed_ip_v6`.
 zwischen VM-Subnetz und externem Netz fehlt ein Router. Deshalb
 `enable_floating_ip = false`.
 
-**Der Image-Name muss übereinstimmen.** Was bei `packer build` als
-`image_name` gesetzt wird, muss in OpenTofu dasselbe sein — sonst findet
-OpenTofu das Image nicht.
+**Teamnamen sind keine gültigen Gruppennamen.** „Team #1“ wäre als
+Linux-Gruppe unzulässig und hätte unquotiert in YAML alle Teams zu „Team“
+verschmolzen. `main.tofu` bildet Teams deshalb auf `[a-z0-9_-]` ab
+(`team-1`, mit Präfix `t-` für Teams, die mit einer Ziffer beginnen).
 
-**Build-Zeit.** Der App Store bricht einen Packer-Build nach **einer Stunde**
-hart ab (`SIGKILL`). Linux-Images bleiben mit 10–15 Minuten weit darunter. Bei
-großen Images wird es eng, und beim harten Abbruch bleibt Packers temporäre
-Bau-VM in OpenStack liegen.
+**Passwort-Auth wird vom Image überstimmt.** Ubuntu-Cloud-Images bringen
+`/etc/ssh/sshd_config.d/60-cloudimg-settings.conf` mit
+`PasswordAuthentication no` mit, und sshd nimmt den ersten gefundenen Wert.
+Die eigene Einstellung heißt deshalb `01-click-n-deploy.conf`.

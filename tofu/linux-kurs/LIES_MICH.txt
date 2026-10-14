@@ -1,0 +1,109 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    LINUX TERMINAL – KURZANLEITUNG                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Willkommen auf deiner Linux-VM!
+Dieses Verzeichnis enthält Übungsaufgaben und eine Kurzreferenz der wichtigsten
+Terminal-Befehle. Starte mit den Aufgaben in den Unterordnern.
+
+  tree linux-kurs/          → Zeigt die komplette Verzeichnisstruktur
+  cat linux-kurs/LIES_MICH.txt   → Diese Datei erneut lesen
+
+──────────────────────────────────────────────────────────────────────────────
+ 1. NAVIGATION
+──────────────────────────────────────────────────────────────────────────────
+  pwd                  Aktuelles Verzeichnis anzeigen (Print Working Directory)
+  ls                   Verzeichnisinhalt auflisten
+  ls -la               Ausführliche Liste inkl. versteckter Dateien
+  cd ordner/           In Ordner wechseln
+  cd ..                Eine Ebene höher gehen
+  cd ~                 In Home-Verzeichnis wechseln
+  cd -                 Zum vorherigen Verzeichnis zurück
+
+──────────────────────────────────────────────────────────────────────────────
+ 2. DATEIEN & VERZEICHNISSE
+──────────────────────────────────────────────────────────────────────────────
+  touch datei.txt      Leere Datei erstellen
+  mkdir ordner         Neuen Ordner anlegen
+  mkdir -p a/b/c       Verschachtelte Ordner auf einmal anlegen
+  cp quelle ziel       Datei kopieren
+  cp -r ordner/ ziel/  Ordner rekursiv kopieren
+  mv alt neu           Datei verschieben oder umbenennen
+  rm datei.txt         Datei löschen
+  rm -r ordner/        Ordner mit Inhalt löschen (Vorsicht!)
+  tree                 Verzeichnisbaum grafisch anzeigen
+
+──────────────────────────────────────────────────────────────────────────────
+ 3. DATEIINHALT LESEN & BEARBEITEN
+──────────────────────────────────────────────────────────────────────────────
+  cat datei.txt        Gesamten Inhalt ausgeben
+  less datei.txt       Inhalt seitenweise lesen (q = beenden)
+  head -n 10 datei     Erste 10 Zeilen
+  tail -n 10 datei     Letzte 10 Zeilen
+  nano datei.txt       Einfacher Text-Editor (Strg+O = speichern, Strg+X = beenden)
+  grep "wort" datei    Nach "wort" in einer Datei suchen
+  grep -r "wort" .     Rekursiv im aktuellen Verzeichnis suchen
+
+──────────────────────────────────────────────────────────────────────────────
+ 4. BERECHTIGUNGEN
+──────────────────────────────────────────────────────────────────────────────
+  ls -l                Rechte anzeigen (rwxrwxrwx = owner/group/others)
+  chmod 755 datei      Rechte setzen (7=rwx, 5=rx, 4=r)
+  chmod +x skript.sh   Ausführbar machen
+  chown user datei     Besitzer ändern
+  sudo befehl          Befehl als Administrator ausführen
+
+  Rechte-Kurzübersicht:
+    r = lesen (4)
+    w = schreiben (2)
+    x = ausführen (1)
+    Beispiel: 644 = rw-r--r--  (owner lesen+schreiben, rest nur lesen)
+
+──────────────────────────────────────────────────────────────────────────────
+ 5. PROZESSE
+──────────────────────────────────────────────────────────────────────────────
+  ps aux               Alle laufenden Prozesse
+  top                  Live-Prozessübersicht (q = beenden)
+  htop                 Verbesserte Prozessübersicht (falls installiert)
+  kill PID             Prozess beenden (PID aus ps oder top ablesen)
+  kill -9 PID          Prozess sofort erzwingen zu beenden
+  befehl &             Befehl im Hintergrund starten
+  jobs                 Hintergrundprozesse anzeigen
+
+──────────────────────────────────────────────────────────────────────────────
+ 6. TEXTVERARBEITUNG & UMLEITUNGEN
+──────────────────────────────────────────────────────────────────────────────
+  echo "Text"          Text ausgeben
+  echo "Text" > a.txt  Text in Datei schreiben (überschreibt)
+  echo "Text" >> a.txt Text an Datei anhängen
+  befehl | grep "x"   Ausgabe filtern (Pipe)
+  wc -l datei.txt      Zeilen zählen
+  sort datei.txt       Zeilen sortieren
+  uniq datei.txt       Duplikate entfernen (nach sort verwenden)
+  cut -d',' -f1 datei  Spalte aus CSV ausschneiden
+
+──────────────────────────────────────────────────────────────────────────────
+ 7. NETZWERK & SYSTEM
+──────────────────────────────────────────────────────────────────────────────
+  ip a                 Netzwerkinterfaces und IP-Adressen
+  ping google.com      Verbindungstest
+  curl https://...     URL abrufen
+  df -h                Festplattennutzung
+  du -sh ordner/       Ordnergröße
+  free -h              RAM-Nutzung
+  uname -a             Systeminformation
+  uptime               Laufzeit und Auslastung
+  history              Befehlshistorie
+  which python3        Pfad eines Programms finden
+  journalctl -n 50     Letzte 50 Systemlog-Einträge (ersetzt /var/log/syslog)
+
+──────────────────────────────────────────────────────────────────────────────
+ 8. HILFE BEKOMMEN
+──────────────────────────────────────────────────────────────────────────────
+  man ls               Handbuchseite für "ls" (q = beenden)
+  ls --help            Kurzhilfe für die meisten Befehle
+  info befehl          Ausführlichere Dokumentation
+
+──────────────────────────────────────────────────────────────────────────────
+ Tipp: Nutze TAB für Autovervollständigung und Pfeiltasten für Befehlshistorie!
+──────────────────────────────────────────────────────────────────────────────
