@@ -196,7 +196,9 @@ fehlerfrei durchlief. Jetzt `fixed_ip_v6`.
 
 **Floating IPs helfen nicht.** Sie lassen sich anlegen, aber nicht zuweisen —
 zwischen VM-Subnetz und externem Netz fehlt ein Router. Deshalb
-`enable_floating_ip = false`.
+`enable_floating_ip = false`. Öffentliches IPv4 kommt stattdessen über
+`ip_mode = "ipv4"` oder `"dual"` und ein IPv4-Netz in `network_v4_uuid`
+(siehe README, Abschnitt Adressfamilie).
 
 **Teamnamen sind keine gültigen Gruppennamen.** „Team #1“ wäre als
 Linux-Gruppe unzulässig und hätte unquotiert in YAML alle Teams zu „Team“

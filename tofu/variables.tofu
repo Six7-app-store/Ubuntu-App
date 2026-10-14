@@ -52,10 +52,35 @@ variable "disk_size_gb" {
 # Netz
 ################################################
 
+# Welche Adressfamilie die Instanz nach aussen anbietet. Waehlt das Netz und
+# legt die SSH-Regeln je Familie an.
+#
+#   ipv4  eine Schnittstelle im IPv4-Netz (network_v4_uuid)
+#   ipv6  eine Schnittstelle im IPv6-Netz (network_uuid) - Standard
+#   dual  IPv6-Netz als Hauptschnittstelle, dazu eine zweite im IPv4-Netz
+variable "ip_mode" {
+  description = "Adressfamilie: ipv4, ipv6 oder dual (beide)"
+  type        = string
+  default     = "ipv6"
+
+  validation {
+    condition     = contains(["ipv4", "ipv6", "dual"], var.ip_mode)
+    error_message = "ip_mode muss \"ipv4\", \"ipv6\" oder \"dual\" sein."
+  }
+}
+
+# Der Name bleibt network_uuid, damit bestehende Deployments beim Redeploy
+# ihre gespeicherte Netzwahl weiter treffen.
 variable "network_uuid" {
-  description = "Hauptnetzwerk @openstack:network:id"
+  description = "Netz mit öffentlicher IPv6, z. B. DHBWV6 - für ipv6 und dual @openstack:network:id"
   type        = string
   default     = "9b579624-d844-4df3-b38d-89978b31d37d"
+}
+
+variable "network_v4_uuid" {
+  description = "Netz mit öffentlich gerouteter IPv4, z. B. DHBWv4 - für ipv4 und dual @openstack:network:id"
+  type        = string
+  default     = ""
 }
 
 variable "floating_ip_pool" {
