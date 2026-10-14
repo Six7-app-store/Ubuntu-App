@@ -1,12 +1,12 @@
 # OpenTofu erwartet weiterhin das Schluesselwort "terraform"; die Provider
 # werden ueber registry.opentofu.org aufgeloest.
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.13.0"
 
   required_providers {
     openstack = {
       source  = "terraform-provider-openstack/openstack"
-      version = "~> 1.54"
+      version = "~> 3.4"
     }
     random = {
       source  = "hashicorp/random"
@@ -31,8 +31,14 @@ provider "openstack" {
 locals {
   # Diese Werte sind App-spezifisch und werden vom App-Entwickler definiert
   app_name = "ubuntu-user"
-  flavor   = "gp1.small"
   key_pair = "" # Leer = nur Passwort-Auth
+
+  # Basis-Image auf newstack; eingerichtet wird beim ersten Boot per
+  # cloud-init (cloud-init.tofu), ein eigenes Image wird nicht gebaut.
+  image_name = "Ubuntu 24.04"
+
+  # Systemplatte als Cinder-Volume nur, wenn eine Groesse gewaehlt ist.
+  boot_from_volume = var.disk_size_gb > 0
 
   # Keine Floating IP. Sie liesse sich in diesem Projekt zwar anlegen,
   # aber nicht zuweisen - zwischen VM-Subnetz und externem Netz fehlt
@@ -105,9 +111,9 @@ resource "random_password" "user_passwords" {
   min_special      = 1
 }
 
-# Packer-built image lookup by name (keine IDs hardcoden)
+# Image per Name nachschlagen (keine IDs hardcoden)
 data "openstack_images_image_v2" "image" {
-  name        = var.image_name
+  name        = local.image_name
   most_recent = true
 }
 
@@ -122,11 +128,25 @@ data "openstack_networking_network_v2" "external" {
 # -----------------------------------------------------------------------------
 resource "openstack_compute_instance_v2" "shared_vm" {
   name        = "${local.app_name}-shared"
-  image_id    = data.openstack_images_image_v2.image.id
-  flavor_name = local.flavor
+  image_id    = local.boot_from_volume ? null : data.openstack_images_image_v2.image.id
+  flavor_name = var.flavor
   key_pair    = local.key_pair != "" ? local.key_pair : null
 
   security_groups = [var.shared_secgroup_id]
+
+  # Mit gewaehlter Plattengroesse bootet die VM von einem Volume aus dem
+  # Image; ohne bleibt es bei der Systemplatte des Flavors.
+  dynamic "block_device" {
+    for_each = local.boot_from_volume ? [1] : []
+    content {
+      uuid                  = data.openstack_images_image_v2.image.id
+      source_type           = "image"
+      destination_type      = "volume"
+      volume_size           = var.disk_size_gb
+      boot_index            = 0
+      delete_on_termination = true
+    }
+  }
 
   timeouts {
     create = "15m"
@@ -137,12 +157,7 @@ resource "openstack_compute_instance_v2" "shared_vm" {
     uuid = var.network_uuid
   }
 
-  user_data = templatefile("${path.module}/cloud-init-multi-user.yml.tpl", {
-    all_users     = local.all_users
-    unique_teams  = local.unique_teams
-    unique_groups = local.unique_groups
-    passwords     = [for p in random_password.user_passwords : p.result]
-  })
+  user_data = local.cloud_init
 
   metadata = merge(local.metadata, {
     teams  = join(",", local.unique_teams)

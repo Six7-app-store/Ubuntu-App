@@ -1,0 +1,22 @@
+ÜBUNG 4 – Prozesse
+===================
+
+Aufgabe 1: Prozesse anzeigen
+  Zeige alle laufenden Prozesse an.
+  Filtere die Ausgabe: Zeige nur Python-Prozesse.
+  Befehle: ps aux, ps aux | grep python
+
+Aufgabe 2: Live-Übersicht
+  Öffne die Live-Prozessübersicht. Welcher Prozess verbraucht am meisten CPU?
+  Befehl: top  (q zum Beenden)
+
+Aufgabe 3: Hintergrundprozess
+  Starte folgenden Befehl im Hintergrund:
+    sleep 60 &
+  Zeige deine Hintergrundprozesse an.
+  Finde die PID des sleep-Prozesses und beende ihn.
+  Befehle: jobs, ps aux | grep sleep, kill <PID>
+
+Aufgabe 4: Prozess-Info
+  Finde heraus, welche PID deine aktuelle Shell hat.
+  Befehl: echo $$
