@@ -74,6 +74,33 @@ locals {
         },
       ],
       local.kurs_files,
+      # ip_mode = dual: die IPv4-Schnittstelle, die OpenTofu nach dem Boot
+      # anhaengt. Ihre DHCP-Routen gehen in eine eigene Tabelle, und nur
+      # Pakete mit ihrer Adresse als Absender nehmen diese Tabelle. Ohne das
+      # gingen Antworten ueber die Default-Route der Hauptschnittstelle
+      # hinaus, und Neutrons Port-Security verwirft sie als gefaelschten
+      # Absender. Gleiches Muster wie der Staging-Aufbau im deployment-Repo.
+      local.dual ? [
+        {
+          path        = "/etc/netplan/60-secondary-ipv4.yaml"
+          permissions = "0600"
+          content = yamlencode({
+            network = {
+              version = 2
+              ethernets = {
+                secondary = {
+                  match           = { macaddress = local.secondary_mac }
+                  dhcp4           = true
+                  dhcp6           = false
+                  accept-ra       = false
+                  dhcp4-overrides = { route-table = 100 }
+                  routing-policy  = [{ from = local.secondary_ipv4, table = 100 }]
+                }
+              }
+            }
+          })
+        },
+      ] : [],
     )
 
     chpasswd = {
@@ -87,7 +114,7 @@ locals {
       ]
     }
 
-    runcmd = [
+    runcmd = concat([
       # Node.js aus dem NodeSource-Repository
       "mkdir -p /etc/apt/keyrings",
       "curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --batch --yes --dearmor -o /etc/apt/keyrings/nodesource.gpg",
@@ -96,6 +123,13 @@ locals {
       "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs",
 
       "systemctl restart ssh",
+      ], local.dual ? [
+      # Die IPv4-Schnittstelle kommt erst nach dem Boot dazu
+      # (interface_attach). Bis zu fuenf Minuten auf ihre MAC warten, dann
+      # die netplan-Datei oben anwenden. Kommt sie nicht, bleibt die VM
+      # ueber IPv6 erreichbar.
+      ["sh", "-c", "for i in $(seq 1 60); do if ip -o link | grep -qi \"$1\"; then netplan apply; break; fi; sleep 5; done", "sh", local.secondary_mac],
+      ] : [], [
 
       # Firewall: erst SSH freigeben, dann einschalten (nicht umgekehrt)
       "ufw allow OpenSSH",
@@ -104,7 +138,7 @@ locals {
       # Setup-Log (OHNE Passwörter aus Sicherheitsgründen). Teamnamen gehen
       # als Argument hinein, nicht in den Formatstring.
       ["sh", "-c", "printf 'Setup abgeschlossen: %s\\nTeams: %s\\nBenutzer erstellt: %s\\n' \"$(date)\" \"$1\" \"$2\" >> /var/log/setup-complete.log", "sh", join(", ", local.unique_teams), tostring(length(local.all_users))],
-    ]
+    ])
 
     final_message = <<-EOT
       ================================================
@@ -113,7 +147,7 @@ locals {
       Teams: ${join(", ", local.unique_teams)}
       Benutzer: ${length(local.all_users)}
 
-      SSH-Login: ssh <username>@<vm-ipv6>
+      SSH-Login: ssh <username>@<vm-ip>
       ================================================
     EOT
   }
