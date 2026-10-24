@@ -15,6 +15,11 @@ mock_provider "openstack" {
       network = { fixed_ip_v6 = "2001:db8::42", fixed_ip_v4 = "10.200.0.42" }
     }
   }
+  mock_data "openstack_networking_subnet_v2" {
+    defaults = {
+      gateway_ip = "141.72.10.1"
+    }
+  }
   mock_resource "openstack_networking_port_v2" {
     defaults = {
       all_fixed_ips = ["141.72.10.7", "2001:db8:4::7"]

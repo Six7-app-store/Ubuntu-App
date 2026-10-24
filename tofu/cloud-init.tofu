@@ -75,11 +75,12 @@ locals {
       ],
       local.kurs_files,
       # ip_mode = dual: die IPv4-Schnittstelle, die OpenTofu nach dem Boot
-      # anhaengt. Ihre DHCP-Routen gehen in eine eigene Tabelle, und nur
-      # Pakete mit ihrer Adresse als Absender nehmen diese Tabelle. Ohne das
-      # gingen Antworten ueber die Default-Route der Hauptschnittstelle
-      # hinaus, und Neutrons Port-Security verwirft sie als gefaelschten
-      # Absender. Gleiches Muster wie der Staging-Aufbau im deployment-Repo.
+      # anhaengt. Ihre Default-Route ueber das Gateway des IPv4-Netzes steht
+      # in einer eigenen Tabelle, und nur Pakete mit ihrer Adresse als
+      # Absender nehmen diese Tabelle. Ohne das gingen Antworten ueber die
+      # Default-Route der Hauptschnittstelle hinaus, und Neutrons
+      # Port-Security verwirft sie als gefaelschten Absender. Gleiches Muster
+      # wie der Staging-Aufbau im deployment-Repo.
       local.dual ? [
         {
           path        = "/etc/netplan/60-secondary-ipv4.yaml"
@@ -93,7 +94,8 @@ locals {
                   dhcp4           = true
                   dhcp6           = false
                   accept-ra       = false
-                  dhcp4-overrides = { route-table = 100 }
+                  dhcp4-overrides = { use-routes = false }
+                  routes          = [{ to = "default", via = local.secondary_gateway, table = 100 }]
                   routing-policy  = [{ from = local.secondary_ipv4, table = 100 }]
                 }
               }
