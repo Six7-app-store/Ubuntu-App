@@ -38,6 +38,22 @@ variables {
   }
 }
 
+run "ssh_gruppe_mit_eindeutigem_namen" {
+  command = apply
+
+  override_resource {
+    target = random_string.secgroup_suffix
+    values = {
+      result = "x7k2qa"
+    }
+  }
+
+  assert {
+    condition     = openstack_networking_secgroup_v2.ssh.name == "ubuntu-user-ssh-x7k2qa"
+    error_message = "Der Name der SSH-Gruppe braucht den Zufallsanhang, sonst kollidieren zwei Deployments im selben Projekt."
+  }
+}
+
 run "standardgroesse_ohne_volume" {
   command = apply
 
